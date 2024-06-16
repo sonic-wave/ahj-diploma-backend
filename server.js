@@ -80,9 +80,11 @@
 
 const http = require('http');
 const Koa = require('koa');
-const { koaBody } = require('koa-body'); // Убедитесь, что `koa-body` импортирован правильно
+const { koaBody } = require('koa-body'); 
 const app = new Koa();
+const fs = require('fs');
 let messages = [];
+
 
 app.use(
   koaBody({
@@ -128,17 +130,95 @@ app.use(async (ctx, next) => {
       ctx.response.status = 201; 
     }
 
+    // if (method === 'createFileMessage') {
+    //   const responseObject = {
+    //     value: ctx.request.body.value,
+    //     type: ctx.request.body.fileType,
+    //   }
+    //   messages.push(responseObject);
+    //   console.log(messages);
+
+    //   ctx.response.body = { responseMessage: responseObject.value };
+    //   ctx.response.status = 201; 
+    // }
+
+
+    // if (method === 'createFileMessage') {
+    //   const file = ctx.request.files.file;
+    //   const fileType = ctx.request.body.fileType;
+
+    //   const responseObject = {
+    //     value: file, 
+    //     type: fileType,
+    //   }
+  
+    //   messages.push(responseObject);
+    //   console.log(messages);
+
+    //   ctx.response.body = { responseMessage: responseObject }; 
+    //   ctx.response.status = 201; 
+    // }
+
+    // if (method === 'createFileMessage') {
+    //   const file = ctx.request.files.file;
+    //   const fileType = ctx.request.body.fileType;
+
+    //   const responseObject = {
+    //     value: {
+    //       originalFilename: file.originalFilename,
+    //       fileType: fileType,
+    //       filepath: file.filepath
+    //     },
+    //     type: fileType,
+    //   };
+  
+    //   messages.push(responseObject);
+    //   console.log(messages);
+
+    //   ctx.response.body = { responseMessage: responseObject.value }; 
+    //   ctx.response.status = 201; 
+    // }
+
+    // if (method === 'createFileMessage') {
+    //   const file = ctx.request.files.file;
+    //   const fileType = ctx.request.body.fileType;
+
+    //   const fileBuffer = fs.readFileSync(file.filepath);
+
+    //   const responseObject = {
+    //     value: fileBuffer,
+    //     filename: file.originalFilename,
+    //     fileType: fileType,
+    //   };
+  
+    //   messages.push(responseObject);
+    //   console.log(messages);
+
+    //   ctx.response.body = { responseMessage: responseObject }; 
+    //   ctx.response.status = 201; 
+    // }
+
     if (method === 'createFileMessage') {
+      const file = ctx.request.files.file;
+      const fileType = ctx.request.body.fileType;
+    
+      const fileBuffer = fs.readFileSync(file.filepath);
+    
       const responseObject = {
-        value: ctx.request.body.value,
-        type: ctx.request.body.fileType,
-      }
+        value: Array.from(new Uint8Array(fileBuffer)), // Convert buffer to array of numbers
+        filename: file.originalFilename,
+        fileType: fileType,
+        size: file.size,
+        lastModified: file.lastModifiedDate ? file.lastModifiedDate.getTime() : Date.now()
+      };
+    
       messages.push(responseObject);
       console.log(messages);
-
-      ctx.response.body = { responseMessage: responseObject.value };
+    
+      ctx.response.body = { responseMessage: responseObject };
       ctx.response.status = 201; 
     }
+
 
     if (method === 'createGeoMessage') {
       const responseObject = {
@@ -164,10 +244,25 @@ app.use(async (ctx, next) => {
   await next();
 });
 
+// app.use(async (ctx, next) => {
+//   if (ctx.request.method === 'GET') {
+//     ctx.response.body = messages;
+//     console.log(messages);
+//   }
+//   await next();
+// });
+
 app.use(async (ctx, next) => {
   if (ctx.request.method === 'GET') {
-    ctx.response.body = messages;
-    console.log(messages);
+    const url = new URL(ctx.request.url, `http://${ctx.request.headers.host}`);
+    const offset = parseInt(url.searchParams.get('offset'), 10) || 0;
+    const limit = parseInt(url.searchParams.get('limit'), 10) || 10;
+
+    const start = Math.max(messages.length - offset - limit, 0);
+    const end = messages.length - offset;
+    const paginatedMessages = messages.slice(start, end).reverse();
+    ctx.response.body = paginatedMessages;
+    console.log(paginatedMessages);
   }
   await next();
 });
